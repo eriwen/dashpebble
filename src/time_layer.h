@@ -3,15 +3,15 @@
 #include "pebble_fonts.h"
 
 typedef struct _TimeLayer {
-    Layer layer;
-    const char *hour_text;
-    const char *minute_text;
-    GFont hour_font;
-    GFont minute_font;
-    GTextLayoutCacheRef layout_cache;
-    GColor text_color: 2;
-    GColor background_color: 2;
-    GTextOverflowMode overflow_mode: 2;
+  Layer layer;
+  const char *hour_text;
+  const char *minute_text;
+  GFont hour_font;
+  GFont minute_font;
+  GTextLayoutCacheRef layout_cache;
+  GColor text_color: 2;
+  GColor background_color: 2;
+  GTextOverflowMode overflow_mode: 2;
 } TimeLayer;
 
 void time_layer_update_proc(TimeLayer *tl, GContext* ctx);

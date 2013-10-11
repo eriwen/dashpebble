@@ -3,17 +3,17 @@
 #include "pebble_fonts.h"
 
 typedef struct _DateLayer {
-    Layer layer;
-    const char *day_text;
-    const char *date_text;
-    const char *month_text;
-    GFont day_font;
-    GFont date_font;
-    GFont month_font;
-    GTextLayoutCacheRef layout_cache;
-    GColor text_color: 2;
-    GColor background_color: 2;
-    GTextOverflowMode overflow_mode: 2;
+  Layer layer;
+  const char *day_text;
+  const char *date_text;
+  const char *month_text;
+  GFont day_font;
+  GFont date_font;
+  GFont month_font;
+  GTextLayoutCacheRef layout_cache;
+  GColor text_color: 2;
+  GColor background_color: 2;
+  GTextOverflowMode overflow_mode: 2;
 } DateLayer;
 
 void date_layer_update_proc(DateLayer *tl, GContext* ctx);
