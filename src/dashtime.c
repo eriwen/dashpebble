@@ -20,6 +20,14 @@ GFont font_month;
 GFont font_hour;
 GFont font_minute;
 
+void upcase(char *text) {
+  for(unsigned short i = 0; i <= strlen(text); i++) {
+    if((text[i] > 96) && (text[i] < 123)) {
+      text[i] = text[i] - 'a' + 'A';
+    }
+  }
+}
+
 void handle_minute_tick(AppContextRef ctx, PebbleTickEvent *t) {
   static char hour_text[] = "00";
   static char minute_text[] = ":00";
@@ -45,6 +53,9 @@ void handle_minute_tick(AppContextRef ctx, PebbleTickEvent *t) {
   string_format_time(day_text, sizeof(day_text), "%a", &current_time);
   string_format_time(date_text, sizeof(date_text), "%d", &current_time);
   string_format_time(month_text, sizeof(month_text), "%b", &current_time);
+
+  upcase(day_text);
+  upcase(month_text);
 
   time_layer_set_text(&time_layer, hour_text, minute_text);
   date_layer_set_text(&date_layer, day_text, date_text, month_text);
