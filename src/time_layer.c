@@ -47,22 +47,6 @@ void time_layer_set_fonts(TimeLayer *tl, GFont hour_font, GFont minute_font) {
   }
 }
 
-void time_layer_set_text_color(TimeLayer *tl, GColor color) {
-  tl->text_color = color;
-
-  if (tl->hour_text && tl->minute_text) {
-    layer_mark_dirty(&(tl->layer));
-  }
-}
-
-void time_layer_set_background_color(TimeLayer *tl, GColor color) {
-  tl->background_color = color;
-
-  if (tl->hour_text && tl->minute_text) {
-    layer_mark_dirty(&(tl->layer));
-  }
-}
-
 void time_layer_init(TimeLayer *tl, GRect frame) {
   layer_init(&tl->layer, frame);
   tl->layer.update_proc = (LayerUpdateProc)time_layer_update_proc;

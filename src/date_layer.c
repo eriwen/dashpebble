@@ -57,22 +57,6 @@ void date_layer_set_fonts(DateLayer *tl, GFont day_font, GFont date_font, GFont 
   }
 }
 
-void date_layer_set_text_color(DateLayer *tl, GColor color) {
-  tl->text_color = color;
-
-  if (tl->day_text && tl->date_text && tl->month_text) {
-    layer_mark_dirty(&(tl->layer));
-  }
-}
-
-void date_layer_set_background_color(DateLayer *tl, GColor color) {
-  tl->background_color = color;
-
-  if (tl->day_text && tl->date_text && tl->month_font) {
-    layer_mark_dirty(&(tl->layer));
-  }
-}
-
 void date_layer_init(DateLayer *tl, GRect frame) {
   layer_init(&tl->layer, frame);
   tl->layer.update_proc = (LayerUpdateProc)date_layer_update_proc;

@@ -19,6 +19,4 @@ typedef struct _DateLayer {
 void date_layer_update_proc(DateLayer *tl, GContext* ctx);
 void date_layer_set_text(DateLayer *tl, char *day_text, char *date_text, char *month_text);
 void date_layer_set_fonts(DateLayer *tl, GFont day_font, GFont date_font, GFont month_font);
-void date_layer_set_text_color(DateLayer *tl, GColor color);
-void date_layer_set_background_color(DateLayer *tl, GColor color);
 void date_layer_init(DateLayer *tl, GRect frame);
