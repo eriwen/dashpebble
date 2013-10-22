@@ -2,8 +2,11 @@
 #include "pebble_app.h"
 #include "pebble_fonts.h"
 
+#include "http.h"
+#include "util.h"
 #include "time_layer.h"
 #include "date_layer.h"
+#include "weather_layer.h"
 
 #define MY_UUID {0xD9, 0xA3, 0xDF, 0xC4, 0x77, 0x68, 0x47, 0x52, 0xBB, 0xAE, 0x0D, 0x60, 0xA6, 0xC5, 0xE9, 0xB8}
 PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, DEFAULT_MENU_ICON, APP_INFO_WATCH_FACE);
@@ -11,11 +14,14 @@ PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, DEFAULT_MENU_ICON
 Window window;
 TimeLayer time_layer;
 DateLayer date_layer;
+WeatherLayer weather_layer;
 
 GFont font_date;
 GFont font_month;
 GFont font_hour;
 GFont font_minute;
+GFont font_weather_icons;
+GFont font_weather_forecast;
 
 void upcase(char *text) {
   for(unsigned short i = 0; i <= strlen(text); i++) {
@@ -56,10 +62,11 @@ void handle_minute_tick(AppContextRef ctx, PebbleTickEvent *t) {
 
   time_layer_set_text(&time_layer, hour_text, minute_text);
   date_layer_set_text(&date_layer, day_text, date_text, month_text);
+  weather_layer_set_text(&weather_layer, "!", "Powered by Forecast.io");
 }
 
 void handle_init(AppContextRef ctx) {
-  window_init(&window, "DashTime");
+  window_init(&window, "DashPebble");
   window_stack_push(&window, false);
   window_set_background_color(&window, GColorBlack);
   window_set_fullscreen(&window, true);
@@ -70,20 +77,23 @@ void handle_init(AppContextRef ctx) {
   font_month = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
   font_hour = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_SUBSET_49));
   font_minute = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_THIN_SUBSET_49));
+  font_weather_icons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CLIMACONS_42));
+  font_weather_forecast = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
 
   time_layer_init(&time_layer, window.layer.frame);
-  time_layer_set_text_color(&time_layer, GColorWhite);
-  time_layer_set_background_color(&time_layer, GColorClear);
   time_layer_set_fonts(&time_layer, font_hour, font_minute);
   layer_set_frame(&time_layer.layer, GRect(0, 6, 144, 168-6));
   layer_add_child(&window.layer, &time_layer.layer);
 
   date_layer_init(&date_layer, window.layer.frame);
-  date_layer_set_text_color(&date_layer, GColorWhite);
-  date_layer_set_background_color(&date_layer, GColorClear);
   date_layer_set_fonts(&date_layer, font_month, font_date, font_month);
   layer_set_frame(&date_layer.layer, GRect(0, 62, 144, 168-62));
   layer_add_child(&window.layer, &date_layer.layer);
+
+  weather_layer_init(&weather_layer, window.layer.frame);
+  weather_layer_set_fonts(&weather_layer, font_weather_icons, font_weather_forecast);
+  layer_set_frame(&weather_layer.layer, GRect(0, 100, 144, 168-100));
+  layer_add_child(&window.layer, &weather_layer.layer);
 
   handle_minute_tick(ctx, NULL);
 }
@@ -93,6 +103,8 @@ void handle_deinit(AppContextRef ctx) {
     fonts_unload_custom_font(font_month);
     fonts_unload_custom_font(font_hour);
     fonts_unload_custom_font(font_minute);
+    fonts_unload_custom_font(font_weather_icons);
+    fonts_unload_custom_font(font_weather_forecast);
 }
 
 void pbl_main(void *params) {
@@ -103,6 +115,12 @@ void pbl_main(void *params) {
     .tick_info = {
       .tick_handler = &handle_minute_tick,
       .tick_units = MINUTE_UNIT
+    },
+    .messaging_info = {
+      .buffer_sizes = {
+        .inbound = 124,
+        .outbound = 256,
+      }
     }
   };
   app_event_loop(params, &handlers);
