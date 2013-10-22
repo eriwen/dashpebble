@@ -14,15 +14,20 @@
             "file": "fonts/Roboto-Thin.ttf"
         },
         {
-            "defName": "FONT_ROBOTO_LIGHT_21",
+            "defName": "FONT_ROBOTO_LIGHT_18",
             "type": "font",
             "file": "fonts/Roboto-Light.ttf"
         },
         {
             "characterRegex": "[0-9]",
-            "defName": "FONT_ROBOTO_BOLD_21",
+            "defName": "FONT_ROBOTO_BOLD_18",
             "type": "font",
             "file": "fonts/Roboto-Bold.ttf"
+        },
+        {
+            "defName": "FONT_CLIMACONS_42",
+            "type": "font",
+            "file": "fonts/Climacons.ttf"
         }
     ]
 }
