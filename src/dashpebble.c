@@ -6,10 +6,7 @@
 #include "date_layer.h"
 
 #define MY_UUID {0xD9, 0xA3, 0xDF, 0xC4, 0x77, 0x68, 0x47, 0x52, 0xBB, 0xAE, 0x0D, 0x60, 0xA6, 0xC5, 0xE9, 0xB8}
-PBL_APP_INFO(MY_UUID, "DashTime", "Eric Wendelin", 0x1, 0x0, DEFAULT_MENU_ICON, APP_INFO_WATCH_FACE);
-
-#define TIME_FRAME (GRect(0, 6, 144, 168-6))
-#define DATE_FRAME (GRect(0, 62, 144, 168-62))
+PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, DEFAULT_MENU_ICON, APP_INFO_WATCH_FACE);
 
 Window window;
 TimeLayer time_layer;
@@ -69,8 +66,8 @@ void handle_init(AppContextRef ctx) {
 
   resource_init_current_app(&APP_RESOURCES);
 
-  font_date = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_21));
-  font_month = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_21));
+  font_date = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_18));
+  font_month = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
   font_hour = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_SUBSET_49));
   font_minute = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_THIN_SUBSET_49));
 
@@ -78,14 +75,14 @@ void handle_init(AppContextRef ctx) {
   time_layer_set_text_color(&time_layer, GColorWhite);
   time_layer_set_background_color(&time_layer, GColorClear);
   time_layer_set_fonts(&time_layer, font_hour, font_minute);
-  layer_set_frame(&time_layer.layer, TIME_FRAME);
+  layer_set_frame(&time_layer.layer, GRect(0, 6, 144, 168-6));
   layer_add_child(&window.layer, &time_layer.layer);
 
   date_layer_init(&date_layer, window.layer.frame);
   date_layer_set_text_color(&date_layer, GColorWhite);
   date_layer_set_background_color(&date_layer, GColorClear);
   date_layer_set_fonts(&date_layer, font_month, font_date, font_month);
-  layer_set_frame(&date_layer.layer, DATE_FRAME);
+  layer_set_frame(&date_layer.layer, GRect(0, 62, 144, 168-62));
   layer_add_child(&window.layer, &date_layer.layer);
 
   handle_minute_tick(ctx, NULL);
