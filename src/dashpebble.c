@@ -7,14 +7,72 @@
 #include "time_layer.h"
 #include "date_layer.h"
 #include "weather_layer.h"
+#include "config.h"
 
-#define MY_UUID {0xD9, 0xA3, 0xDF, 0xC4, 0x77, 0x68, 0x47, 0x52, 0xBB, 0xAE, 0x0D, 0x60, 0xA6, 0xC5, 0xE9, 0xB8}
+#define MY_UUID {0x91, 0x41, 0xB6, 0x28, 0xBC, 0x89, 0x49, 0x8E, 0xB1, 0x47, 0x0D, 0x60, 0xA6, 0xC5, 0xE9, 0xB8}
 PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, DEFAULT_MENU_ICON, APP_INFO_WATCH_FACE);
+
+// POST variables
+#define WEATHER_KEY_LATITUDE 1
+#define WEATHER_KEY_LONGITUDE 2
+#define WEATHER_KEY_UNIT_SYSTEM 3
+// Received variables
+#define WEATHER_KEY_CURRENT 1
+
+#define WEATHER_HTTP_COOKIE 1949327669
 
 Window window;
 TimeLayer time_layer;
 DateLayer date_layer;
 WeatherLayer weather_layer;
+
+static int our_latitude, our_longitude;
+static bool located;
+
+void request_weather();
+void handle_timer(AppContextRef app_ctx, AppTimerHandle handle, uint32_t cookie);
+
+void failed(int32_t cookie, int http_status, void* context) {
+  if(cookie == 0 || cookie == WEATHER_HTTP_COOKIE) {
+    weather_layer_set_text(&weather_layer, "!", "HTTP Failed");
+  }
+}
+
+void success(int32_t cookie, int http_status, DictionaryIterator* received, void* context) {
+  if(cookie != WEATHER_HTTP_COOKIE) return;
+  Tuple* data_tuple = dict_find(received, WEATHER_KEY_CURRENT);
+  if(data_tuple) {
+    // The below bitwise dance is so we can actually fit our precipitation forecast.
+    uint16_t value = data_tuple->value->int16;
+    uint8_t icon = value >> 11;
+
+    int16_t temp = value & 0x3ff;
+    if(value & 0x400) temp = -temp;
+    if(icon < 10) {
+      weather_layer_set_text(&weather_layer, "A", itoa(temp));
+    } else {
+      weather_layer_set_text(&weather_layer, "!", itoa(temp));
+    }
+  }
+}
+
+void reconnect(void* context) {
+  request_weather();
+}
+
+void set_timer(AppContextRef ctx) {
+  // every 15 minutes
+  app_timer_send_event(ctx, 1740000, 1);
+}
+
+void location(float latitude, float longitude, float altitude, float accuracy, void* context) {
+  // Fix the floats
+  our_latitude = latitude * 10000;
+  our_longitude = longitude * 10000;
+  located = true;
+  request_weather();
+  set_timer((AppContextRef)context);
+}
 
 GFont font_date;
 GFont font_month;
@@ -62,23 +120,21 @@ void handle_minute_tick(AppContextRef ctx, PebbleTickEvent *t) {
 
   time_layer_set_text(&time_layer, hour_text, minute_text);
   date_layer_set_text(&date_layer, day_text, date_text, month_text);
-  weather_layer_set_text(&weather_layer, "!", "Powered by Forecast.io");
 }
 
 void handle_init(AppContextRef ctx) {
+  resource_init_current_app(&APP_RESOURCES);
   window_init(&window, "DashPebble");
-  window_stack_push(&window, false);
+  window_stack_push(&window, true);
   window_set_background_color(&window, GColorBlack);
   window_set_fullscreen(&window, true);
-
-  resource_init_current_app(&APP_RESOURCES);
 
   font_date = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_18));
   font_month = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
   font_hour = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_SUBSET_49));
   font_minute = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_THIN_SUBSET_49));
   font_weather_icons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CLIMACONS_42));
-  font_weather_forecast = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
+  font_weather_forecast = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_SUBSET_32));
 
   time_layer_init(&time_layer, window.layer.frame);
   time_layer_set_fonts(&time_layer, font_hour, font_minute);
@@ -95,27 +151,39 @@ void handle_init(AppContextRef ctx) {
   layer_set_frame(&weather_layer.layer, GRect(0, 100, 144, 168-100));
   layer_add_child(&window.layer, &weather_layer.layer);
 
+  http_set_app_id(63897234);
+  http_register_callbacks((HTTPCallbacks){
+    .failure=failed,
+    .success=success,
+    .reconnect=reconnect,
+    .location=location
+  }, (void*)ctx);
+
+  // Request weather
+  located = false;
+  request_weather();
+
   handle_minute_tick(ctx, NULL);
 }
 
 void handle_deinit(AppContextRef ctx) {
-    fonts_unload_custom_font(font_date);
-    fonts_unload_custom_font(font_month);
-    fonts_unload_custom_font(font_hour);
-    fonts_unload_custom_font(font_minute);
-    fonts_unload_custom_font(font_weather_icons);
-    fonts_unload_custom_font(font_weather_forecast);
+  fonts_unload_custom_font(font_date);
+  fonts_unload_custom_font(font_month);
+  fonts_unload_custom_font(font_hour);
+  fonts_unload_custom_font(font_minute);
+  fonts_unload_custom_font(font_weather_icons);
+  fonts_unload_custom_font(font_weather_forecast);
 }
 
 void pbl_main(void *params) {
   PebbleAppHandlers handlers = {
     .init_handler = &handle_init,
     .deinit_handler = &handle_deinit,
-
     .tick_info = {
       .tick_handler = &handle_minute_tick,
       .tick_units = MINUTE_UNIT
     },
+    .timer_handler = handle_timer,
     .messaging_info = {
       .buffer_sizes = {
         .inbound = 124,
@@ -124,4 +192,32 @@ void pbl_main(void *params) {
     }
   };
   app_event_loop(params, &handlers);
+}
+
+void handle_timer(AppContextRef ctx, AppTimerHandle handle, uint32_t cookie) {
+  request_weather();
+  if(cookie)
+    set_timer(ctx);
+}
+
+void request_weather() {
+  if(!located) {
+    http_location_request();
+    return;
+  }
+  // Build the HTTP request
+  DictionaryIterator *body;
+  HTTPResult result = http_out_get("http://forecast-service.herokuapp.com/index.php", WEATHER_HTTP_COOKIE, &body);
+  if(result != HTTP_OK) {
+    weather_layer_set_text(&weather_layer, "!", "HTTP Response :(");
+    return;
+  }
+  dict_write_int32(body, WEATHER_KEY_LATITUDE, our_latitude);
+  dict_write_int32(body, WEATHER_KEY_LONGITUDE, our_longitude);
+  dict_write_cstring(body, WEATHER_KEY_UNIT_SYSTEM, UNIT_SYSTEM);
+  // Send it.
+  if(http_out_send() != HTTP_OK) {
+    weather_layer_set_text(&weather_layer, "!", "HTTP Request :(");
+    return;
+  }
 }

@@ -1,4 +1,5 @@
 #include "weather_layer.h"
+#include "util.h"
 
 void weather_layer_update_proc(WeatherLayer *tl, GContext* ctx) {
   if (tl->background_color != GColorClear) {
@@ -11,9 +12,9 @@ void weather_layer_update_proc(WeatherLayer *tl, GContext* ctx) {
     GRect icon_bounds = tl->layer.bounds;
     GRect forecast_bounds = tl->layer.bounds;
 
-    icon_bounds.size.w = 40;
-    forecast_bounds.origin.x = 43;
-    forecast_bounds.size.w = 168-43;
+    icon_bounds.size.w = 144 / 2 - 1;
+    forecast_bounds.origin.x = 144 / 2 + 1;
+    forecast_bounds.size.w = 144 / 2 - 1;
 
     graphics_text_draw(ctx, tl->icon_text, tl->icon_font, icon_bounds,
       tl->overflow_mode, GTextAlignmentRight, tl->layout_cache);
@@ -22,9 +23,9 @@ void weather_layer_update_proc(WeatherLayer *tl, GContext* ctx) {
   }
 }
 
-void weather_layer_set_text(WeatherLayer *tl, char *icon_text, char *forecast_text) {
+void weather_layer_set_text(WeatherLayer *tl, char *icon_text, char *temperature) {
   tl->icon_text = icon_text;
-  tl->forecast_text = forecast_text;
+  tl->forecast_text = temperature;
 
   layer_mark_dirty(&(tl->layer));
 }
