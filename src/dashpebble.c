@@ -28,13 +28,14 @@ WeatherLayer weather_layer;
 
 static int our_latitude, our_longitude;
 static bool located;
+static const char* const WEATHER_ICON_IDS = "IN*60B<!\"#F";
 
 void request_weather();
 void handle_timer(AppContextRef app_ctx, AppTimerHandle handle, uint32_t cookie);
 
 void failed(int32_t cookie, int http_status, void* context) {
   if(cookie == 0 || cookie == WEATHER_HTTP_COOKIE) {
-    weather_layer_set_text(&weather_layer, "!", "HTTP Failed");
+    weather_layer_set_text(&weather_layer, "", "---ºF");
   }
 }
 
@@ -44,15 +45,16 @@ void success(int32_t cookie, int http_status, DictionaryIterator* received, void
   if(data_tuple) {
     // The below bitwise dance is so we can actually fit our precipitation forecast.
     uint16_t value = data_tuple->value->int16;
-    uint8_t icon = value >> 11;
+    uint8_t icon_id = value >> 11;
 
     int16_t temp = value & 0x3ff;
     if(value & 0x400) temp = -temp;
-    if(icon < 10) {
-      weather_layer_set_text(&weather_layer, "A", itoa(temp));
-    } else {
-      weather_layer_set_text(&weather_layer, "!", itoa(temp));
-    }
+
+    static char temp_str[] = "---ºF";
+    static char icon_str[] = "F";
+    snprintf(temp_str, sizeof(temp_str), "%dºF", temp);
+    snprintf(icon_str, sizeof(icon_str), "%c", WEATHER_ICON_IDS[icon_id]);
+    weather_layer_set_text(&weather_layer, icon_str, temp_str);
   }
 }
 
@@ -134,7 +136,7 @@ void handle_init(AppContextRef ctx) {
   font_hour = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_SUBSET_49));
   font_minute = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_THIN_SUBSET_49));
   font_weather_icons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CLIMACONS_42));
-  font_weather_forecast = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_SUBSET_32));
+  font_weather_forecast = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_SUBSET_28));
 
   time_layer_init(&time_layer, window.layer.frame);
   time_layer_set_fonts(&time_layer, font_hour, font_minute);
@@ -148,10 +150,11 @@ void handle_init(AppContextRef ctx) {
 
   weather_layer_init(&weather_layer, window.layer.frame);
   weather_layer_set_fonts(&weather_layer, font_weather_icons, font_weather_forecast);
+  weather_layer_set_text(&weather_layer, "", "---º");
   layer_set_frame(&weather_layer.layer, GRect(0, 100, 144, 168-100));
   layer_add_child(&window.layer, &weather_layer.layer);
 
-  http_set_app_id(63897234);
+  http_set_app_id(rand());
   http_register_callbacks((HTTPCallbacks){
     .failure=failed,
     .success=success,
@@ -209,7 +212,7 @@ void request_weather() {
   DictionaryIterator *body;
   HTTPResult result = http_out_get("http://forecast-service.herokuapp.com/index.php", WEATHER_HTTP_COOKIE, &body);
   if(result != HTTP_OK) {
-    weather_layer_set_text(&weather_layer, "!", "HTTP Response :(");
+    weather_layer_set_text(&weather_layer, "", "---º");
     return;
   }
   dict_write_int32(body, WEATHER_KEY_LATITUDE, our_latitude);
@@ -217,7 +220,7 @@ void request_weather() {
   dict_write_cstring(body, WEATHER_KEY_UNIT_SYSTEM, UNIT_SYSTEM);
   // Send it.
   if(http_out_send() != HTTP_OK) {
-    weather_layer_set_text(&weather_layer, "!", "HTTP Request :(");
+    weather_layer_set_text(&weather_layer, "", "---º");
     return;
   }
 }

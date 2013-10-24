@@ -17,6 +17,4 @@ typedef struct _WeatherLayer {
 void weather_layer_update_proc(WeatherLayer *tl, GContext* ctx);
 void weather_layer_set_text(WeatherLayer *tl, char *icon_text, char *forecast_text);
 void weather_layer_set_fonts(WeatherLayer *tl, GFont icon_font, GFont forecast_font);
-void weather_layer_set_text_color(WeatherLayer *tl, GColor color);
-void weather_layer_set_background_color(WeatherLayer *tl, GColor color);
 void weather_layer_init(WeatherLayer *tl, GRect frame);

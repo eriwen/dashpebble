@@ -14,8 +14,7 @@
             "file": "fonts/Roboto-Thin.ttf"
         },
         {
-            "characterRegex": "[0-9:\u00b0-]",
-            "defName": "FONT_ROBOTO_LIGHT_SUBSET_32",
+            "defName": "FONT_ROBOTO_LIGHT_SUBSET_28",
             "type": "font",
             "file": "fonts/Roboto-Light.ttf"
         },
