@@ -12,9 +12,10 @@ void weather_layer_update_proc(WeatherLayer *tl, GContext* ctx) {
     GRect icon_bounds = tl->layer.bounds;
     GRect forecast_bounds = tl->layer.bounds;
 
-    icon_bounds.size.w = 60;
-    forecast_bounds.origin.x = 64;
-    forecast_bounds.size.w = 144-64;
+    icon_bounds.size.w = 50;
+    forecast_bounds.origin.x = 60;
+    forecast_bounds.origin.y = 2;
+    forecast_bounds.size.w = 144-60;
 
     graphics_text_draw(ctx, tl->icon_text, tl->icon_font, icon_bounds,
       tl->overflow_mode, GTextAlignmentRight, tl->layout_cache);

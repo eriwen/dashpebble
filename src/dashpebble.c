@@ -10,7 +10,7 @@
 #include "config.h"
 
 #define MY_UUID {0x91, 0x41, 0xB6, 0x28, 0xBC, 0x89, 0x49, 0x8E, 0xB1, 0x47, 0x0D, 0x60, 0xA6, 0xC5, 0xE9, 0xB8}
-PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, DEFAULT_MENU_ICON, APP_INFO_WATCH_FACE);
+PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, RESOURCE_ID_IMAGE_MENU_ICON, APP_INFO_WATCH_FACE);
 
 // POST variables
 #define WEATHER_KEY_LATITUDE 1
@@ -18,6 +18,7 @@ PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, DEFAULT_MENU_ICON
 #define WEATHER_KEY_UNIT_SYSTEM 3
 // Received variables
 #define WEATHER_KEY_CURRENT 1
+#define WEATHER_KEY_SUMMARY 2
 
 #define WEATHER_HTTP_COOKIE 1949327669
 
@@ -28,14 +29,14 @@ WeatherLayer weather_layer;
 
 static int our_latitude, our_longitude;
 static bool located;
-static const char* const WEATHER_ICON_IDS = "IN*60B<!\"#F";
+static const char* const WEATHER_ICON_IDS = "IN$60B<!\"#F";
 
 void request_weather();
 void handle_timer(AppContextRef app_ctx, AppTimerHandle handle, uint32_t cookie);
 
 void failed(int32_t cookie, int http_status, void* context) {
   if(cookie == 0 || cookie == WEATHER_HTTP_COOKIE) {
-    weather_layer_set_text(&weather_layer, "", "---ºF");
+    weather_layer_set_text(&weather_layer, "", "---º");
   }
 }
 
@@ -43,13 +44,13 @@ void success(int32_t cookie, int http_status, DictionaryIterator* received, void
   if(cookie != WEATHER_HTTP_COOKIE) return;
   Tuple* data_tuple = dict_find(received, WEATHER_KEY_CURRENT);
   if(data_tuple) {
-    // The below bitwise dance is so we can actually fit our precipitation forecast.
     uint16_t value = data_tuple->value->int16;
     uint8_t icon_id = value >> 11;
 
     int16_t temp = value & 0x3ff;
     if(value & 0x400) temp = -temp;
 
+    // TODO: variable units
     static char temp_str[] = "---ºF";
     static char icon_str[] = "F";
     snprintf(temp_str, sizeof(temp_str), "%dºF", temp);
@@ -63,8 +64,8 @@ void reconnect(void* context) {
 }
 
 void set_timer(AppContextRef ctx) {
-  // every 15 minutes
-  app_timer_send_event(ctx, 1740000, 1);
+  // schedule event in 30 minutes
+  app_timer_send_event(ctx, 1800000, 1);
 }
 
 void location(float latitude, float longitude, float altitude, float accuracy, void* context) {
@@ -135,7 +136,7 @@ void handle_init(AppContextRef ctx) {
   font_month = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
   font_hour = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_SUBSET_49));
   font_minute = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_THIN_SUBSET_49));
-  font_weather_icons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CLIMACONS_42));
+  font_weather_icons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CLIMACONS_36));
   font_weather_forecast = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_SUBSET_28));
 
   time_layer_init(&time_layer, window.layer.frame);
@@ -150,7 +151,8 @@ void handle_init(AppContextRef ctx) {
 
   weather_layer_init(&weather_layer, window.layer.frame);
   weather_layer_set_fonts(&weather_layer, font_weather_icons, font_weather_forecast);
-  weather_layer_set_text(&weather_layer, "", "---º");
+  weather_layer_set_text(&weather_layer, "F", "---º");
+  // TODO: "Powered by forecast.io"
   layer_set_frame(&weather_layer.layer, GRect(0, 100, 144, 168-100));
   layer_add_child(&window.layer, &weather_layer.layer);
 
