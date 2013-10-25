@@ -30,9 +30,14 @@
             "file": "fonts/Roboto-Bold.ttf"
         },
         {
-            "defName": "FONT_CLIMACONS_42",
+            "defName": "FONT_CLIMACONS_36",
             "type": "font",
             "file": "fonts/Climacons.ttf"
+        },
+        {
+            "defName": "IMAGE_MENU_ICON",
+            "type": "png",
+            "file": "images/dashpebble-menu-icon.png"
         }
     ]
 }
