@@ -1,7 +1,7 @@
-# DashTime
+# DashPebble
 A Pebble watch face modeled after DashClock for Android.
 
-![DashTime Watch Face](dashtime.jpg)
+![DashPebble Watch Face](dashpebble.png)
 
 # Installation
 Currently, you have to build the project yourself. Follow [Pebble Developer](http://developer.getpebble.com/) instructions for building and installing apps onto your pebble.
