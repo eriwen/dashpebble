@@ -1,0 +1,58 @@
+{
+  "uuid": "9141b628-bc89-498e-b147-0d60a6c5e9b8",
+  "shortName": "DashPebble",
+  "longName": "DashPebble",
+  "companyName": "Eric Wendelin",
+  "versionCode": 1,
+  "versionLabel": "1.0.0",
+  "watchapp": {
+    "watchface": true
+  },
+  "appKeys": {
+      "icon": 0,
+      "temperature": 1
+  },
+  "resources": {
+    "media": [
+      {
+        "type": "font",
+        "characterRegex": "[:0-9]",
+        "name": "FONT_ROBOTO_BOLD_SUBSET_49",
+        "file": "fonts/Roboto-Bold.ttf"
+      },
+      {
+        "type": "font",
+        "characterRegex": "[:0-9]",
+        "name": "FONT_ROBOTO_THIN_SUBSET_49",
+        "file": "fonts/Roboto-Thin.ttf"
+      },
+      {
+        "type": "font",
+        "name": "FONT_ROBOTO_LIGHT_SUBSET_28",
+        "file": "fonts/Roboto-Light.ttf"
+      },
+      {
+        "type": "font",
+        "name": "FONT_ROBOTO_LIGHT_18",
+        "file": "fonts/Roboto-Light.ttf"
+      },
+      {
+        "type": "font",
+        "characterRegex": "[0-9]",
+        "name": "FONT_ROBOTO_BOLD_18",
+        "file": "fonts/Roboto-Bold.ttf"
+      },
+      {
+        "type": "font",
+        "name": "FONT_CLIMACONS_36",
+        "file": "fonts/Climacons.ttf"
+      },
+      {
+        "menuIcon": true,
+        "type": "png",
+        "name": "IMAGE_MENU_ICON",
+        "file": "images/dashpebble-menu-icon.png"
+      }
+    ]
+  }
+}

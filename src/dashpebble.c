@@ -1,81 +1,17 @@
-#include "pebble_os.h"
-#include "pebble_app.h"
-#include "pebble_fonts.h"
+#include "pebble.h"
 
-#include "http.h"
-#include "util.h"
-#include "time_layer.h"
-#include "date_layer.h"
-#include "weather_layer.h"
-#include "config.h"
+static Window *window;
 
-#define MY_UUID {0x91, 0x41, 0xB6, 0x28, 0xBC, 0x89, 0x49, 0x8E, 0xB1, 0x47, 0x0D, 0x60, 0xA6, 0xC5, 0xE9, 0xB8}
-PBL_APP_INFO(MY_UUID, "DashPebble", "Eric Wendelin", 0x1, 0x0, RESOURCE_ID_IMAGE_MENU_ICON, APP_INFO_WATCH_FACE);
+static TextLayer *hour_layer;
+static TextLayer *minute_layer;
+static TextLayer *day_layer;
+static TextLayer *date_layer;
+static TextLayer *month_layer;
+static TextLayer *icon_layer;
+static TextLayer *temperature_layer;
 
-// POST variables
-#define WEATHER_KEY_LATITUDE 1
-#define WEATHER_KEY_LONGITUDE 2
-#define WEATHER_KEY_UNIT_SYSTEM 3
-// Received variables
-#define WEATHER_KEY_CURRENT 1
-#define WEATHER_KEY_SUMMARY 2
-
-#define WEATHER_HTTP_COOKIE 1949327669
-
-Window window;
-TimeLayer time_layer;
-DateLayer date_layer;
-WeatherLayer weather_layer;
-
-static int our_latitude, our_longitude;
-static bool located;
-static const char* const WEATHER_ICON_IDS = "IN$60B<!\"#F";
-
-void request_weather();
-void handle_timer(AppContextRef app_ctx, AppTimerHandle handle, uint32_t cookie);
-
-void failed(int32_t cookie, int http_status, void* context) {
-  if(cookie == 0 || cookie == WEATHER_HTTP_COOKIE) {
-    weather_layer_set_text(&weather_layer, "", "---º");
-  }
-}
-
-void success(int32_t cookie, int http_status, DictionaryIterator* received, void* context) {
-  if(cookie != WEATHER_HTTP_COOKIE) return;
-  Tuple* data_tuple = dict_find(received, WEATHER_KEY_CURRENT);
-  if(data_tuple) {
-    uint16_t value = data_tuple->value->int16;
-    uint8_t icon_id = value >> 11;
-
-    int16_t temp = value & 0x3ff;
-    if(value & 0x400) temp = -temp;
-
-    // TODO: variable units
-    static char temp_str[] = "---ºF";
-    static char icon_str[] = "F";
-    snprintf(temp_str, sizeof(temp_str), "%dºF", temp);
-    snprintf(icon_str, sizeof(icon_str), "%c", WEATHER_ICON_IDS[icon_id]);
-    weather_layer_set_text(&weather_layer, icon_str, temp_str);
-  }
-}
-
-void reconnect(void* context) {
-  request_weather();
-}
-
-void set_timer(AppContextRef ctx) {
-  // schedule event in 30 minutes
-  app_timer_send_event(ctx, 1800000, 1);
-}
-
-void location(float latitude, float longitude, float altitude, float accuracy, void* context) {
-  // Fix the floats
-  our_latitude = latitude * 10000;
-  our_longitude = longitude * 10000;
-  located = true;
-  request_weather();
-  set_timer((AppContextRef)context);
-}
+static AppSync sync;
+static uint8_t sync_buffer[64];
 
 GFont font_date;
 GFont font_month;
@@ -83,6 +19,48 @@ GFont font_hour;
 GFont font_minute;
 GFont font_weather_icons;
 GFont font_weather_forecast;
+
+enum WeatherKey {
+  WEATHER_ICON_KEY = 0x0,         // TUPLE_INT
+  WEATHER_TEMPERATURE_KEY = 0x1   // TUPLE_CSTRING
+};
+
+static const char* const WEATHER_ICON_IDS = "IN$60B<!\"#F";
+
+static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
+}
+
+static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
+  static char icon_str[] = "F";
+  switch (key) {
+    case WEATHER_ICON_KEY:
+      snprintf(icon_str, sizeof(icon_str), "%c", WEATHER_ICON_IDS[new_tuple->value->uint8]);
+      text_layer_set_text(icon_layer, icon_str);
+      break;
+
+    case WEATHER_TEMPERATURE_KEY:
+      // App Sync keeps new_tuple in sync_buffer, so we may use it directly
+      text_layer_set_text(temperature_layer, new_tuple->value->cstring);
+      break;
+  }
+}
+
+static void send_cmd(void) {
+  Tuplet value = TupletInteger(1, 1);
+
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+
+  if (iter == NULL) {
+    return;
+  }
+
+  dict_write_tuplet(iter, &value);
+  dict_write_end(iter);
+
+  app_message_outbox_send();
+}
 
 void upcase(char *text) {
   for(unsigned short i = 0; i <= strlen(text); i++) {
@@ -92,19 +70,14 @@ void upcase(char *text) {
   }
 }
 
-void handle_minute_tick(AppContextRef ctx, PebbleTickEvent *t) {
+void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed) {
   static char hour_text[] = "00";
   static char minute_text[] = ":00";
   static char day_text[] = "MON";
   static char date_text[] = "01";
   static char month_text[] = "JAN";
 
-  (void)ctx;
-
   char *hour_format;
-
-  PblTm current_time;
-  get_time(&current_time);
 
   if (clock_is_24h_style()) {
     hour_format = "%H";
@@ -112,25 +85,24 @@ void handle_minute_tick(AppContextRef ctx, PebbleTickEvent *t) {
     hour_format = "%l";
   }
 
-  string_format_time(hour_text, sizeof(hour_text), hour_format, &current_time);
-  string_format_time(minute_text, sizeof(minute_text), ":%M", &current_time);
-  string_format_time(day_text, sizeof(day_text), "%a", &current_time);
-  string_format_time(date_text, sizeof(date_text), "%d", &current_time);
-  string_format_time(month_text, sizeof(month_text), "%b", &current_time);
+  strftime(hour_text, sizeof(hour_text), hour_format, tick_time);
+  strftime(minute_text, sizeof(minute_text), ":%M", tick_time);
+  strftime(day_text, sizeof(day_text), "%a", tick_time);
+  strftime(date_text, sizeof(date_text), "%d", tick_time);
+  strftime(month_text, sizeof(month_text), "%b", tick_time);
 
   upcase(day_text);
   upcase(month_text);
 
-  time_layer_set_text(&time_layer, hour_text, minute_text);
-  date_layer_set_text(&date_layer, day_text, date_text, month_text);
+  text_layer_set_text(hour_layer, hour_text);
+  text_layer_set_text(minute_layer, minute_text);
+  text_layer_set_text(day_layer, day_text);
+  text_layer_set_text(date_layer, date_text);
+  text_layer_set_text(month_layer, month_text);
 }
 
-void handle_init(AppContextRef ctx) {
-  resource_init_current_app(&APP_RESOURCES);
-  window_init(&window, "DashPebble");
-  window_stack_push(&window, true);
-  window_set_background_color(&window, GColorBlack);
-  window_set_fullscreen(&window, true);
+static void window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
 
   font_date = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_BOLD_18));
   font_month = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
@@ -139,39 +111,102 @@ void handle_init(AppContextRef ctx) {
   font_weather_icons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CLIMACONS_36));
   font_weather_forecast = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_SUBSET_28));
 
-  time_layer_init(&time_layer, window.layer.frame);
-  time_layer_set_fonts(&time_layer, font_hour, font_minute);
-  layer_set_frame(&time_layer.layer, GRect(0, 6, 144, 168-6));
-  layer_add_child(&window.layer, &time_layer.layer);
+  // TODO: nested layer and center
+  hour_layer = text_layer_create(GRect(0, 6, 65, 168-6));
+  text_layer_set_text_color(hour_layer, GColorWhite);
+  text_layer_set_background_color(hour_layer, GColorClear);
+  text_layer_set_text_alignment(hour_layer, GTextAlignmentRight);
+  text_layer_set_font(hour_layer, font_hour);
+  layer_add_child(window_layer, text_layer_get_layer(hour_layer));
 
-  date_layer_init(&date_layer, window.layer.frame);
-  date_layer_set_fonts(&date_layer, font_month, font_date, font_month);
-  layer_set_frame(&date_layer.layer, GRect(0, 62, 144, 168-62));
-  layer_add_child(&window.layer, &date_layer.layer);
+  minute_layer = text_layer_create(GRect(67, 6, 144-67, 168-6));
+  text_layer_set_text_color(minute_layer, GColorWhite);
+  text_layer_set_background_color(minute_layer, GColorClear);
+  text_layer_set_text_alignment(minute_layer, GTextAlignmentLeft);
+  text_layer_set_font(minute_layer, font_minute);
+  layer_add_child(window_layer, text_layer_get_layer(minute_layer));
 
-  weather_layer_init(&weather_layer, window.layer.frame);
-  weather_layer_set_fonts(&weather_layer, font_weather_icons, font_weather_forecast);
-  weather_layer_set_text(&weather_layer, "F", "---º");
-  // TODO: "Powered by forecast.io"
-  layer_set_frame(&weather_layer.layer, GRect(0, 100, 144, 168-100));
-  layer_add_child(&window.layer, &weather_layer.layer);
+  day_layer = text_layer_create(GRect(0, 62, 60, 168-62));
+  text_layer_set_text_color(day_layer, GColorWhite);
+  text_layer_set_background_color(day_layer, GColorClear);
+  text_layer_set_text_alignment(day_layer, GTextAlignmentRight);
+  text_layer_set_font(day_layer, font_month);
+  layer_add_child(window_layer, text_layer_get_layer(day_layer));
 
-  http_set_app_id(rand());
-  http_register_callbacks((HTTPCallbacks){
-    .failure=failed,
-    .success=success,
-    .reconnect=reconnect,
-    .location=location
-  }, (void*)ctx);
+  date_layer = text_layer_create(GRect(60, 62, 30, 168-62));
+  text_layer_set_text_color(date_layer, GColorWhite);
+  text_layer_set_background_color(date_layer, GColorClear);
+  text_layer_set_text_alignment(date_layer, GTextAlignmentCenter);
+  text_layer_set_font(date_layer, font_date);
+  layer_add_child(window_layer, text_layer_get_layer(date_layer));
 
-  // Request weather
-  located = false;
-  request_weather();
+  month_layer = text_layer_create(GRect(90, 62, 144-90, 168-62));
+  text_layer_set_text_color(month_layer, GColorWhite);
+  text_layer_set_background_color(month_layer, GColorClear);
+  text_layer_set_text_alignment(month_layer, GTextAlignmentLeft);
+  text_layer_set_font(month_layer, font_month);
+  layer_add_child(window_layer, text_layer_get_layer(month_layer));
 
-  handle_minute_tick(ctx, NULL);
+  icon_layer = text_layer_create(GRect(0, 100, 50, 168-100));
+  text_layer_set_text_color(icon_layer, GColorWhite);
+  text_layer_set_background_color(icon_layer, GColorClear);
+  text_layer_set_text_alignment(icon_layer, GTextAlignmentRight);
+  text_layer_set_font(icon_layer, font_weather_icons);
+  layer_add_child(window_layer, text_layer_get_layer(icon_layer));
+
+  temperature_layer = text_layer_create(GRect(62, 100, 144-62, 168-100));
+  text_layer_set_text_color(temperature_layer, GColorWhite);
+  text_layer_set_background_color(temperature_layer, GColorClear);
+  text_layer_set_font(temperature_layer, font_weather_forecast);
+  text_layer_set_text_alignment(temperature_layer, GTextAlignmentLeft);
+  layer_add_child(window_layer, text_layer_get_layer(temperature_layer));
+
+  // TODO: Powered by Forecast.io
+
+  tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
+
+  Tuplet initial_values[] = {
+    TupletInteger(WEATHER_ICON_KEY, (uint8_t) 0),
+    TupletCString(WEATHER_TEMPERATURE_KEY, "---\u00B0F")
+  };
+
+  app_sync_init(&sync, sync_buffer, sizeof(sync_buffer), initial_values, ARRAY_LENGTH(initial_values),
+      sync_tuple_changed_callback, sync_error_callback, NULL);
+
+  send_cmd();
 }
 
-void handle_deinit(AppContextRef ctx) {
+static void window_unload(Window *window) {
+  app_sync_deinit(&sync);
+
+  text_layer_destroy(hour_layer);
+  text_layer_destroy(minute_layer);
+  text_layer_destroy(day_layer);
+  text_layer_destroy(date_layer);
+  text_layer_destroy(month_layer);
+  text_layer_destroy(icon_layer);
+  text_layer_destroy(temperature_layer);
+}
+
+static void init(void) {
+  window = window_create();
+  window_set_background_color(window, GColorBlack);
+  window_set_fullscreen(window, true);
+  window_set_window_handlers(window, (WindowHandlers) {
+    .load = window_load,
+    .unload = window_unload
+  });
+
+  const int inbound_size = 64;
+  const int outbound_size = 64;
+  app_message_open(inbound_size, outbound_size);
+
+  const bool animated = true;
+  window_stack_push(window, animated);
+}
+
+static void deinit(void) {
+  window_destroy(window);
   fonts_unload_custom_font(font_date);
   fonts_unload_custom_font(font_month);
   fonts_unload_custom_font(font_hour);
@@ -180,49 +215,8 @@ void handle_deinit(AppContextRef ctx) {
   fonts_unload_custom_font(font_weather_forecast);
 }
 
-void pbl_main(void *params) {
-  PebbleAppHandlers handlers = {
-    .init_handler = &handle_init,
-    .deinit_handler = &handle_deinit,
-    .tick_info = {
-      .tick_handler = &handle_minute_tick,
-      .tick_units = MINUTE_UNIT
-    },
-    .timer_handler = handle_timer,
-    .messaging_info = {
-      .buffer_sizes = {
-        .inbound = 124,
-        .outbound = 256,
-      }
-    }
-  };
-  app_event_loop(params, &handlers);
-}
-
-void handle_timer(AppContextRef ctx, AppTimerHandle handle, uint32_t cookie) {
-  request_weather();
-  if(cookie)
-    set_timer(ctx);
-}
-
-void request_weather() {
-  if(!located) {
-    http_location_request();
-    return;
-  }
-  // Build the HTTP request
-  DictionaryIterator *body;
-  HTTPResult result = http_out_get("http://forecast-service.herokuapp.com/index.php", WEATHER_HTTP_COOKIE, &body);
-  if(result != HTTP_OK) {
-    weather_layer_set_text(&weather_layer, "", "---º");
-    return;
-  }
-  dict_write_int32(body, WEATHER_KEY_LATITUDE, our_latitude);
-  dict_write_int32(body, WEATHER_KEY_LONGITUDE, our_longitude);
-  dict_write_cstring(body, WEATHER_KEY_UNIT_SYSTEM, UNIT_SYSTEM);
-  // Send it.
-  if(http_out_send() != HTTP_OK) {
-    weather_layer_set_text(&weather_layer, "", "---º");
-    return;
-  }
+int main(void) {
+  init();
+  app_event_loop();
+  deinit();
 }
