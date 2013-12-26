@@ -9,6 +9,7 @@ static TextLayer *date_layer;
 static TextLayer *month_layer;
 static TextLayer *icon_layer;
 static TextLayer *temperature_layer;
+static TextLayer *message_layer;
 
 static AppSync sync;
 static uint8_t sync_buffer[64];
@@ -22,7 +23,8 @@ GFont font_weather_forecast;
 
 enum WeatherKey {
   WEATHER_ICON_KEY = 0x0,         // TUPLE_INT
-  WEATHER_TEMPERATURE_KEY = 0x1   // TUPLE_CSTRING
+  WEATHER_TEMPERATURE_KEY = 0x1,  // TUPLE_CSTRING
+  WEATHER_MESSAGE_KEY = 0x2       // TUPLE_CSTRING
 };
 
 static const char* const WEATHER_ICON_IDS = "IN$60B<!\"#F";
@@ -38,10 +40,12 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
       snprintf(icon_str, sizeof(icon_str), "%c", WEATHER_ICON_IDS[new_tuple->value->uint8]);
       text_layer_set_text(icon_layer, icon_str);
       break;
-
     case WEATHER_TEMPERATURE_KEY:
       // App Sync keeps new_tuple in sync_buffer, so we may use it directly
       text_layer_set_text(temperature_layer, new_tuple->value->cstring);
+      break;
+    case WEATHER_MESSAGE_KEY:
+      text_layer_set_text(message_layer, new_tuple->value->cstring);
       break;
   }
 }
@@ -147,7 +151,7 @@ static void window_load(Window *window) {
   text_layer_set_font(month_layer, font_month);
   layer_add_child(window_layer, text_layer_get_layer(month_layer));
 
-  icon_layer = text_layer_create(GRect(0, 100, 50, 168-100));
+  icon_layer = text_layer_create(GRect(0, 100, 58, 168-100));
   text_layer_set_text_color(icon_layer, GColorWhite);
   text_layer_set_background_color(icon_layer, GColorClear);
   text_layer_set_text_alignment(icon_layer, GTextAlignmentRight);
@@ -161,13 +165,19 @@ static void window_load(Window *window) {
   text_layer_set_text_alignment(temperature_layer, GTextAlignmentLeft);
   layer_add_child(window_layer, text_layer_get_layer(temperature_layer));
 
-  // TODO: Powered by Forecast.io
+  message_layer = text_layer_create(GRect(0, 145, 144, 168-145));
+  text_layer_set_text_color(message_layer, GColorWhite);
+  text_layer_set_background_color(message_layer, GColorClear);
+  text_layer_set_font(message_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(message_layer, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(message_layer));
 
   tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
 
   Tuplet initial_values[] = {
     TupletInteger(WEATHER_ICON_KEY, (uint8_t) 0),
-    TupletCString(WEATHER_TEMPERATURE_KEY, "---\u00B0F")
+    TupletCString(WEATHER_TEMPERATURE_KEY, "---\u00B0F"),
+    TupletCString(WEATHER_MESSAGE_KEY, "Powered by Forecast.io")
   };
 
   app_sync_init(&sync, sync_buffer, sizeof(sync_buffer), initial_values, ARRAY_LENGTH(initial_values),
@@ -186,6 +196,7 @@ static void window_unload(Window *window) {
   text_layer_destroy(month_layer);
   text_layer_destroy(icon_layer);
   text_layer_destroy(temperature_layer);
+  text_layer_destroy(message_layer);
 }
 
 static void init(void) {

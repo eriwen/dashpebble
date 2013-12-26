@@ -1,4 +1,6 @@
-const FORECAST_IO_API_KEY = 'FORECAST_IO_API_KEY';
+/*global Pebble*/
+
+const FORECAST_IO_API_KEY = '';
 
 function getIconId(iconName) {
     return ['clear-day', 'clear-night', 'rain', 'snow', 'sleet', 'wind', 'fog', 'cloudy', 'partly-cloudy-day', 'partly-cloudy-night'].indexOf(iconName);
@@ -14,8 +16,9 @@ function fetchWeather(latitude, longitude) {
             if (request.status === 200) {
                 var response = JSON.parse(request.responseText);
                 Pebble.sendAppMessage({
-                    "icon": getIconId(response['currently']['icon']),
-                    "temperature": Math.round(response['currently']['temperature']) + '\u00B0F'
+                    'icon': getIconId(response['currently']['icon']),
+                    'temperature': Math.round(response['currently']['temperature']) + '\u00B0F',
+                    'message': ''
                 });
             } else {
                 console.log('Error: ' + request.status);
@@ -30,15 +33,30 @@ function locationSuccess(pos) {
     fetchWeather(coordinates.latitude, coordinates.longitude);
 }
 
+var locationOptions = { "timeout": 15000, "maximumAge": 600000 };
+
 function locationError(err) {
     console.warn('location error (' + err.code + '): ' + err.message);
-    Pebble.sendAppMessage({
-        "city":"Loc Unavailable",
-        "temperature":"N/A"
-    });
+    switch(err.code) {
+        case err.TIMEOUT:
+            // Quick fallback when no suitable cached position exists.
+            Pebble.sendAppMessage({
+                'message': 'Location Timed Out'
+            });
+            // Acquire a new position object.
+            navigator.geolocation.getCurrentPosition(locationSuccess, locationError, locationOptions);
+            break;
+        case err.PERMISSION_DENIED:
+            Pebble.sendAppMessage({
+                'message': 'Loc Permission Denied'
+            });
+            break;
+        default: // POSITION_UNAVAILABLE
+            Pebble.sendAppMessage({
+                'message': 'Location Unavailable'
+            });
+    }
 }
-
-var locationOptions = { "timeout": 15000, "maximumAge": 60000 };
 
 Pebble.addEventListener('ready', function(e) {
     window.navigator.geolocation.watchPosition(locationSuccess, locationError, locationOptions);

@@ -10,7 +10,8 @@
   },
   "appKeys": {
       "icon": 0,
-      "temperature": 1
+      "temperature": 1,
+      "message": 2
   },
   "resources": {
     "media": [
