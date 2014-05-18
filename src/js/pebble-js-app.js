@@ -29,8 +29,7 @@ function fetchWeather(latitude, longitude) {
 }
 
 function locationSuccess(pos) {
-    var coordinates = pos.coords;
-    fetchWeather(coordinates.latitude, coordinates.longitude);
+    fetchWeather(pos.coords.latitude, pos.coords.longitude);
 }
 
 var locationOptions = { "timeout": 15000, "maximumAge": 600000 };
@@ -59,9 +58,9 @@ function locationError(err) {
 }
 
 Pebble.addEventListener('ready', function(e) {
-    window.navigator.geolocation.watchPosition(locationSuccess, locationError, locationOptions);
-});
-
-Pebble.addEventListener('appmessage', function(e) {
-    window.navigator.geolocation.getCurrentPosition(locationSuccess, locationError, locationOptions);
+    function getForecastForCurrentLocation() {
+      window.navigator.geolocation.getCurrentPosition(locationSuccess, locationError, locationOptions);
+    }
+    getForecastForCurrentLocation();
+    setInterval(getForecastForCurrentLocation, 15 * 60 * 1000);
 });
