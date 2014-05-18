@@ -57,10 +57,9 @@ function locationError(err) {
     }
 }
 
-Pebble.addEventListener('ready', function(e) {
-    function getForecastForCurrentLocation() {
-      window.navigator.geolocation.getCurrentPosition(locationSuccess, locationError, locationOptions);
-    }
-    getForecastForCurrentLocation();
-    setInterval(getForecastForCurrentLocation, 15 * 60 * 1000);
-});
+function getForecastForCurrentLocation() {
+  window.navigator.geolocation.getCurrentPosition(locationSuccess, locationError, locationOptions);
+}
+
+Pebble.addEventListener('ready', getForecastForCurrentLocation);
+Pebble.addEventListener('appmessage', getForecastForCurrentLocation);

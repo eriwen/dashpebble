@@ -27,6 +27,8 @@ enum WeatherKey {
   WEATHER_MESSAGE_KEY = 0x2       // TUPLE_CSTRING
 };
 
+const unsigned int WEATHER_INTERVAL_IN_MINUTES = 15;
+
 static const char* const WEATHER_ICON_IDS = "IN$60B<!\"#F";
 
 char *translate_error(AppMessageResult result) {
@@ -123,6 +125,12 @@ void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed) {
   text_layer_set_text(day_layer, day_text);
   text_layer_set_text(date_layer, date_text);
   text_layer_set_text(month_layer, month_text);
+
+  time_t now = time(NULL);
+  struct tm * currentTime = localtime(&now);
+  if ((currentTime->tm_min % WEATHER_INTERVAL_IN_MINUTES) == 0) {
+    send_cmd();
+  }
 }
 
 static void window_load(Window *window) {
